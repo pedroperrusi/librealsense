@@ -30,9 +30,11 @@ function require_package {
 #	master		UBUNTU: Ubuntu-4.4.0-128.154				Stefan Bader					4 weeks
 #	master-next	UBUNTU: SAUCE: Redpine: fix soft-ap invisible issue	Sanjay Kumar Konduri	2 days
 
+# As of April 1st, 2019
 #Ubuntu bionic repo : http://kernel.ubuntu.com/git/ubuntu/ubuntu-bionic.git/
-#	master		UBUNTU: Ubuntu-4.15.0-23.25					Stefan Bader					4 weeks
-#	master-next	ixgbe/ixgbevf: Free IRQ when PCI error recovery removes the device	Mauro S M Rodrigues	2 days
+#	hwe			UBUNTU: Ubuntu-hwe-4.18.0-17.18~18.04.1		Juerg Haefliger	3 weeks
+#	hwe-edge	UBUNTU: Ubuntu-hwe-edge-5.0.0-8.9~18.04.1	Thadeu Lima de Souza Cascardo	12 days
+#	master		UBUNTU: Ubuntu-4.15.0-46.49					Khalid Elmously	8 weeks
 
 function choose_kernel_branch {
 
@@ -59,24 +61,29 @@ function choose_kernel_branch {
 			;;
 		*)
 			#error message shall be redirected to stderr to be printed properly
-			echo -e "\e[31mUnsupported kernel version $1 . The patches are maintained for Ubuntu LTS with kernel versions 4.4, 4.8, 4.10 and 4.13 only\e[0m" >&2
+			echo -e "\e[31mUnsupported kernel version $1 . The patches are maintained for Ubuntu16 (Xenial) with LTS kernel versions 4.4, 4.8, 4.10, 4.13 and 4.15\e[0m" >&2
 			exit 1
 			;;
 		esac
 	else
 		if [ "$2" != "bionic" ];
 		then
-			echo -e "\e[31mUnsupported distribution $2 kernel version $1 . The patches are maintained for Ubuntu LTS bionic/xenial with kernel versions 4.4, 4.8, 4.10 and 4.15 only\e[0m" >&2
+			echo -e "\e[31mUnsupported distribution $2 kernel version $1 . The patches are maintained for Ubuntu16/18 (Xenial/Bionic) with LTS kernels 4-[4,8,10,13,15,18]\e[0m" >&2
 			exit 1
 		fi
-
-		case "${kernel_version[1]}" in
-		"15")								 	# kernel 4.15 for Ubuntu 18/Bionic Beaver
+		case "${kernel_version[0]}.${kernel_version[1]}" in
+		"4.15")								 	# kernel 4.15 for Ubuntu 18/Bionic Beaver
 			echo master
+			;;
+		"4.18")								 	# kernel 4.18 for Ubuntu 18/Bionic Beaver
+			echo hwe
+			;;
+		"5.0")								 	# kernel 5.0 for Ubuntu 18/Bionic Beaver
+			echo hwe-edge
 			;;
 		*)
 			#error message shall be redirected to stderr to be printed properly
-			echo -e "\e[31mUnsupported kernel version $1 . The patches are maintained for Ubuntu Bionic LTS with kernel 4.15 only\e[0m" >&2
+			echo -e "\e[31mUnsupported kernel version $1 . The Bionic patches are maintained for Ubuntu LTS with kernels 4.15, 4.18 and 5.0 only\e[0m" >&2
 			exit 1
 			;;
 		esac
@@ -86,13 +93,19 @@ function choose_kernel_branch {
 function try_unload_module {
 	unload_module_name=$1
 	op_failed=0
-
-	sudo modprobe -r ${unload_module_name} || op_failed=$?
-
+	
+	#redirect local errrors
+	exec 3>&2
+	exec 2> /dev/null
+	if [ $(lsmod | grep ^${unload_module_name} | wc -l) -ne 0 ]; then
+		sudo modprobe -r ${unload_module_name} || op_failed=$?
+	fi
+	exec 2>&3
 	if [ $op_failed -ne 0 ];
 	then
-		echo -e "\e[31mFailed to unload module $unload_module_name. error type $op_failed . Operation is aborted\e[0m" >&2
-		exit 1
+		echo -e "\e[31mFailed to unload (er=$op_failed).\e[0m" >&2
+	else
+		echo -e "\e[32msucceeded.\e[0m" >&2
 	fi
 }
 
@@ -100,8 +113,12 @@ function try_load_module {
 	load_module_name=$1
 	op_failed=0
 
-	sudo modprobe ${load_module_name} || op_failed=$?
-
+	if [ $(lsmod | grep ^${load_module_name} | wc -l) -eq 0 ]; then
+		sudo modprobe ${load_module_name} || op_failed=$?
+	else
+		printf "\e[32mn/a\e[0m"
+	fi
+	
 	if [ $op_failed -ne 0 ];
 	then
 		echo -e "\e[31mFailed to reload module $load_module_name. error type $op_failed . Operation is aborted\e[0m"  >&2
@@ -116,7 +133,7 @@ function try_module_insert {
 	backup_available=1
 	dependent_modules=""
 
-	printf "\e[32mReplacing \e[93m\e[1m%s \e[32m:\n\e[0m" ${module_name}
+	printf "\e[32mReplacing \e[93m\e[1m%s \e[32m -\n\e[0m" ${module_name}
 
 	#Check if the module is loaded, and if does - are there dependent kernel modules.
 	#Unload those first, then unload the requsted module and proceed with replacement
@@ -126,21 +143,45 @@ function try_module_insert {
 	# Note that in case of multiple dependencies we'll remove only modules one by one starting with the first on the list
 	if [ $(lsmod | grep ^${module_name} | wc -l) -ne 0 ];
 	then
-		dependent_module=$(lsmod | grep ^${module_name} | awk '{printf $4}' | awk -F, '{printf $1}')
-
-		while [ ! -z "$dependent_module" ]
+		#Register all the dependent modules for later use
+		IFS=',' read -a modules_list <<< $(lsmod | grep ^${module_name} | awk '{printf $4}')
+		for dep_name in ${modules_list[@]}
 		do
-			printf "\e[32m\tModule \e[93m\e[1m%s \e[32m\e[21m is used by \e[34m$dependent_module\n\e[0m" ${module_name}
-			printf "\e[32m\tUnloading dependency \e[34m$dependent_module\e[0m\n\t"
-			dependent_modules+="$dependent_module "
-			try_unload_module $dependent_module
-			dependent_module=$(lsmod | grep ^${module_name} | awk '{printf $4}' | awk -F, '{printf $1}')
+			dependent_modules+="$dep_name "
 		done
+		#echo "Module ${module_name} is used by [${modules_list[*]}], unwind recursively"
+		
+		#Unload all modules that use the module that we are going to replace.
+		# Iterative unwinding due to circular dependencies
+		first_dependent_module=$(lsmod | grep ^${module_name} | awk '{printf $4}' | awk -F, '{printf $1}')
+		iter=0
+		while [ ! -z "$first_dependent_module" ] && [ $iter -le 2 ]; do
+			#echo "Iteration $iter: Unwinding dependent modules : ${modules_list[*]}"
+			for cur_dep in ${modules_list[@]}
+			do
+				#lsmod | grep ^${cur_dep}
+				printf "\e[32m\t Unload \e[34m$cur_dep\e[0m\t- "
 
-		# Unload existing modules if resident
-		printf "\e[32mModule is resident, unloading ... \e[0m"
+				if [ $(lsmod | grep ^${cur_dep} | wc -l) -ne 0 ]; then
+					#printf "\e[32m\tModule \e[93m\e[1m%s \e[32m\e[21m is used by \e[34m$cur_dep\n\e[0m" ${module_name}
+					try_unload_module $cur_dep
+				else
+					printf "\e[32mn/a\n\e[0m"
+				fi
+			done
+			first_dependent_module=$(lsmod | grep ^${module_name} | awk '{printf $4}' | awk -F, '{printf $1}')
+			#echo "New first dependency is ${first_dependent_module}"
+			iter+=1
+		done
+		
+		#Verification
+	fi
+
+	if [ $(lsmod | grep ^${module_name} | wc -l) -ne 0 ];
+	then
+		# Unload existing module if is still resident
+		printf "\e[32m\tModule \e[93m\e[1m${module_name}  \e[0m\e[32m is resident, unloading ... \e[0m"
 		try_unload_module ${module_name}
-		printf "\e[32m succeeded. \e[0m\n"
 	fi
 
 	# backup the existing module (if available) for recovery
@@ -156,7 +197,7 @@ function try_module_insert {
 
 	# try to load the new module
 	modprobe_failed=0
-	printf "\e[32mApplying the patched module ... \e[0m"
+	printf "\e[32m\tApplying the patched module ... \e[0m"
 	sudo modprobe ${module_name} || modprobe_failed=$?
 
 	# Check and revert the backup module if 'modprobe' operation crashed
@@ -173,20 +214,22 @@ function try_module_insert {
 		exit 1
 	else
 		# Everything went OK, delete backup
-		printf "\e[32m succeeded\n\e[0m"
+		printf "\e[32m succeeded\e[0m"
 		sudo rm ${tgt_ko}.bckup
 	fi
 
+	unique_dep_modules=$(echo "$dependent_modules"|tr " " "\n"|sort -u|tr "\n" ",")
 	# Reload all dependent modules recursively
-	if [ ! -z "$dependent_modules" ];
+	if [ ! -z "$unique_dep_modules" ];
 	then
 		#Retrieve the list of dependent modules that were unloaded
-		modules_list=(${dependent_modules})
+		#modules_list=(${unique_dep_modules})
+		IFS=',' read -a modules_list <<< $(lsmod | grep ^${unique_dep_modules} | awk '{printf $4}')
 		for (( idx=${#modules_list[@]}-1 ; idx>=0 ; idx-- ));
 		do
 			printf "\e[32m\tReloading dependent kernel module \e[34m${modules_list[idx]} \e[32m... \e[0m"
 			try_load_module ${modules_list[idx]}
-			printf "\e[32m succeeded. \e[0m\n"
+			printf "\e[32m RLDsucceeded. \e[0m\n"
 		done
 	fi
 	printf "\n"
