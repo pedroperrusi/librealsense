@@ -20,7 +20,7 @@ fi
 source ./scripts/patch-utils.sh
 
 # Get the required tools and headers to build the kernel
-sudo apt-get install linux-headers-generic build-essential git -y
+sudo apt-get install linux-headers-generic build-essential git bc -y
 #Packages to build the patched modules
 require_package libusb-1.0-0-dev
 require_package libssl-dev
@@ -59,6 +59,10 @@ cd ${kernel_name}
 
 # Verify that there are no trailing changes., warn the user to make corrective action if needed
 
+
+#Get kernel major.minor
+IFS='.' read -a kernel_version <<< ${LINUX_BRANCH}
+k_maj_min=$((${kernel_version[0]}*100 + ${kernel_version[1]}))
 
 #Get kernel major.minor
 IFS='.' read -a kernel_version <<< ${LINUX_BRANCH}
