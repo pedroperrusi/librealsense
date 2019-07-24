@@ -145,7 +145,6 @@ function try_module_insert {
 	# for instance : videobuf2_core,videobuf2_v4l2,uvcvideo will start with unloading uvcvideo as it should automatically unwind dependent modules
 	if [ $(lsmod | grep ^${module_name} | wc -l) -ne 0 ];
 	then
-<<<<<<< HEAD
 		#Register all the dependent modules for later use
 		IFS=',' read -a modules_list <<< $(lsmod | grep ^${module_name} | awk '{printf $4}')
 		for dep_name in ${modules_list[@]}
@@ -175,20 +174,6 @@ function try_module_insert {
 			first_dependent_module=$(lsmod | grep ^${module_name} | awk '{printf $4}' | awk -F, '{printf $1}')
 			#echo "New first dependency is ${first_dependent_module}"
 			iter+=1
-=======
-		dependencies=$(lsmod | grep ^${module_name} | awk '{printf $4}')
-		dependent_module=$(lsmod | grep ^${module_name} | awk '{printf $4}' | awk -F, '{printf $NF}')
-		if [ ! -z "$dependencies" ];
-		then
-			printf "\e[32m\tModule \e[93m\e[1m%s \e[32m\e[21m is used by \e[34m$dependencies\n\e[0m" ${module_name}
-		fi
-		while [ ! -z "$dependent_module" ]
-		do
-			printf "\e[32m\tUnloading dependency \e[34m$dependent_module\e[0m\n\t"
-			dependent_modules+="$dependent_module "
-			try_unload_module $dependent_module
-			dependent_module=$(lsmod | grep ^${module_name} | awk '{printf $4}' | awk -F, '{printf $NF}')
->>>>>>> d6f6be84b46190c8c84c95f6ac279d239320fcda
 		done
 		
 		#Verification

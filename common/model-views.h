@@ -269,7 +269,7 @@ namespace rs2
         }
 
         template<class T>
-        void foreach(T action)
+        void foreachRS(T action)
         {
             std::lock_guard<std::mutex> lock(_lookup_mutex);
             for (auto&& kvp : _queues)

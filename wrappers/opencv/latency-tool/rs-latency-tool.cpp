@@ -10,15 +10,17 @@ int main(int argc, char * argv[]) try
     using namespace cv;
     using namespace rs2;
 
+    std::cout << "Starting up... " << std::endl;
+
     // Start RealSense camera
     // Uncomment the configuration you wish to test
     pipeline pipe;
     config cfg;
-    //cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_BGR8);
-    //cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
-    cfg.enable_stream(RS2_STREAM_COLOR, 1920, 1080, RS2_FORMAT_BGR8, 30);
-    //cfg.enable_stream(RS2_STREAM_INFRARED, 640, 480, RS2_FORMAT_Y8);
-    //cfg.enable_stream(RS2_STREAM_INFRARED, 1280, 720, RS2_FORMAT_Y8);
+    // cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_BGR8);
+    cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
+    // cfg.enable_stream(RS2_STREAM_COLOR, 1920, 1080, RS2_FORMAT_BGR8, 30);
+    // cfg.enable_stream(RS2_STREAM_INFRARED, 640, 480, RS2_FORMAT_Y8);
+    // cfg.enable_stream(RS2_STREAM_INFRARED, 1280, 720, RS2_FORMAT_Y8);
     pipe.start(cfg);
 
     // To test with a regular webcam, comment-out the previous block
@@ -57,6 +59,7 @@ int main(int argc, char * argv[]) try
 
     while (getWindowProperty(window_name, WND_PROP_AUTOSIZE) >= 0)
     {
+        std::cout << "Loop... " << std::endl;
         // Wait for frameset from the camera
         for (auto f : pipe.wait_for_frames())
         {
@@ -99,12 +102,12 @@ int main(int argc, char * argv[]) try
 
         // Display current frame. WaitKey is doing the actual rendering
         imshow(window_name, display);
-        if (waitKey(1) >= 0) break;
+        if (waitKey(1) == 'q') break;
 
         // Report rendering of current frame is done
         d.end_render();
     }
-
+    std::cout << "Exit... " << std::endl;
     return EXIT_SUCCESS;
 }
 catch (const rs2::error & e)

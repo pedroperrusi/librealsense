@@ -38,7 +38,8 @@ then
 	retpoline_retrofit=1
 fi
 kernel_branch=$(choose_kernel_branch ${LINUX_BRANCH} ${ubuntu_codename})
-kernel_name="ubuntu-${ubuntu_codename}-$kernel_branch"
+#kernel_name="ubuntu-${ubuntu_codename}-$kernel_branch"
+kernel_name="linux-4.18.16"
 echo -e "\e[32mCreate patches workspace in \e[93m${kernel_name} \e[32mfolder\n\e[0m"
 
 #Distribution-specific packages
@@ -53,31 +54,11 @@ fi
 
 
 # Get the linux kernel and change into source tree
-[ ! -d ${kernel_name} ] && git clone -b $kernel_branch git://kernel.ubuntu.com/ubuntu/ubuntu-${ubuntu_codename}.git --depth 1 ./${kernel_name}
+#[ ! -d ${kernel_name} ] && git clone -b $kernel_branch git://kernel.ubuntu.com/ubuntu/ubuntu-${ubuntu_codename}.git --depth 1 ./${kernel_name}
 cd ${kernel_name}
 
 # Verify that there are no trailing changes., warn the user to make corrective action if needed
-if [ $(git status | grep 'modified:' | wc -l) -ne 0 ];
-then
-	echo -e "\e[36mThe kernel has modified files:\e[0m"
-	git status | grep 'modified:'
-	echo -e "\e[36mProceeding will reset all local kernel changes. Press 'n' within 3 seconds to abort the operation"
-	set +e
-	read -n 1 -t 3 -r -p "Do you want to proceed? [Y/n]" response
-	set -e
-	response=${response,,}    # tolower
-	if [[ $response =~ ^(n|N)$ ]]; 
-	then
-		echo -e "\e[41mScript has been aborted on user requiest. Please resolve the modified files are rerun\e[0m"
-		exit 1
-	else
-		echo -e "\e[0m"
-		echo -e "\e[32mUpdate the folder content with the latest from mainline branch\e[0m"
-		git fetch origin $kernel_branch --depth 1
-		printf "Resetting local changes in %s folder\n " ${kernel_name}
-		git reset --hard $kernel_branch
-	fi
-fi
+
 
 #Get kernel major.minor
 IFS='.' read -a kernel_version <<< ${LINUX_BRANCH}

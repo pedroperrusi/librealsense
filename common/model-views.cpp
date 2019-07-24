@@ -1443,7 +1443,7 @@ namespace rs2
 
         _options_invalidated = true;
 
-        queues.foreach([&](frame_queue& q)
+        queues.foreachRS([&](frame_queue& q)
         {
             frame f;
             while (q.poll_for_frame(&f));
