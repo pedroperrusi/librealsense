@@ -17,10 +17,10 @@ int main(int argc, char * argv[]) try
     pipeline pipe;
     config cfg;
     // cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_BGR8);
-    cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
+    // cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
     // cfg.enable_stream(RS2_STREAM_COLOR, 1920, 1080, RS2_FORMAT_BGR8, 30);
     // cfg.enable_stream(RS2_STREAM_INFRARED, 640, 480, RS2_FORMAT_Y8);
-    // cfg.enable_stream(RS2_STREAM_INFRARED, 1280, 720, RS2_FORMAT_Y8);
+    cfg.enable_stream(RS2_STREAM_INFRARED, 1280, 720, RS2_FORMAT_Y8);
     pipe.start(cfg);
 
     // To test with a regular webcam, comment-out the previous block
